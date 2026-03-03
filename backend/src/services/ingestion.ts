@@ -1,13 +1,13 @@
-export async function validateYouTubeUrl(url: string): Promise<boolean> {
-  // basic regex check
+import axios from 'axios';
+import ytdl from 'ytdl-core';
+import fs from 'fs';
+
+export function validateYouTubeUrl(url: string): boolean {
   return /^https?:\/\/(www\.)?youtube\.com/.test(url) || /^https?:\/\/(youtu\.be)\//.test(url);
 }
 
-import axios from 'axios';
-
 export async function fetchMetadata(url: string): Promise<any> {
-  // extract video ID from URL
-  const match = url.match(/(?:v=|youtu\.be\/)([\w-]{11})/);
+  const match = url.match(/(?:v=|youtu\.be\/)([\\w-]{11})/);
   if (!match) throw new Error('invalid youtube url');
   const videoId = match[1];
   const apiKey = process.env.YOUTUBE_API_KEY;
@@ -24,7 +24,7 @@ export async function fetchMetadata(url: string): Promise<any> {
   return {
     title: item.snippet.title,
     description: item.snippet.description,
-    tags: item.snippet.tags,
+    tags: item.snippet.tags || [],
     publishedAt: item.snippet.publishedAt,
     views: item.statistics.viewCount,
     duration: item.contentDetails.duration,
@@ -32,6 +32,10 @@ export async function fetchMetadata(url: string): Promise<any> {
 }
 
 export async function downloadVideo(url: string, destPath: string): Promise<void> {
-  // stub, use ytdl-core or similar in production
-  console.log('Downloading', url, 'to', destPath);
+  return new Promise((resolve, reject) => {
+    ytdl(url, { quality: 'highest' })
+      .pipe(fs.createWriteStream(destPath))
+      .on('finish', () => resolve())
+      .on('error', reject);
+  });
 }

@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
+// Use Vercel API URL, or localhost for dev
+const API_URL = process.env.REACT_APP_API_URL || (typeof window !== 'undefined' && window.location.hostname === 'localhost' ? 'http://localhost:3000' : window.location.origin);
+
 export default function Home() {
   const [url, setUrl] = useState('');
   const [jobId, setJobId] = useState<string | null>(null);
@@ -9,26 +12,37 @@ export default function Home() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const resp = await axios.post('/api/videos', { youtubeUrl: url, options: {} });
-    const id = resp.data.jobId;
-    setJobId(id);
-    setStatus('queued');
-    // start polling
-    pollStatus(id);
+    try {
+      const resp = await axios.post(`${API_URL}/api/videos`, { youtubeUrl: url, options: {} });
+      const id = resp.data.jobId;
+      setJobId(id);
+      setStatus('queued');
+      setVideoUrl(null);
+      // start polling
+      pollStatus(id);
+    } catch (err) {
+      console.error(err);
+      setStatus('error: ' + (err as any).message);
+    }
   };
 
   const pollStatus = (id: string) => {
     const interval = setInterval(async () => {
-      const resp = await axios.get(`/api/videos/jobs/${id}/status`);
-      setStatus(resp.data.status + ' ' + resp.data.progress + '%');
-      if (resp.data.status === 'completed') {
-        clearInterval(interval);
-        if (resp.data.result?.videoUrl) {
-          setVideoUrl(resp.data.result.videoUrl);
+      try {
+        const resp = await axios.get(`${API_URL}/api/jobs/${id}/status`);
+        setStatus(resp.data.status + ' ' + resp.data.progress + '%');
+        if (resp.data.status === 'completed') {
+          clearInterval(interval);
+          if (resp.data.result?.videoUrl) {
+            setVideoUrl(resp.data.result.videoUrl);
+          }
         }
-      }
-      if (resp.data.status === 'failed') {
-        clearInterval(interval);
+        if (resp.data.status === 'failed') {
+          clearInterval(interval);
+          setStatus('failed: ' + resp.data.error);
+        }
+      } catch (err) {
+        console.error(err);
       }
     }, 3000);
   };
@@ -48,8 +62,8 @@ export default function Home() {
           Generate
         </button>
       </form>
-      {jobId && <p className="mt-4">Job ID: {jobId}</p>}
-      {status && <p>Status: {status}</p>}
+      {jobId && <p className="mt-4 text-sm text-gray-600">Job ID: {jobId}</p>}
+      {status && <p className="mt-2">Status: {status}</p>}
       {videoUrl && (
         <div className="mt-4">
           <a href={videoUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
